@@ -72,7 +72,7 @@ public class PlayerInputHandler : MonoBehaviour
             moveDown = Key.DownArrow;
             moveLeft = Key.LeftArrow;
             moveRight = Key.RightArrow;
-            jump = Key.RightShift;
+            jump = Key.RightCtrl;
         }
     }
 
