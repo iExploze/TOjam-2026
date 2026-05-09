@@ -39,6 +39,7 @@ public class PlayerStats
     }
 }
 
+
 [RequireComponent(typeof(PlayerInputHandler))]
 [RequireComponent(typeof(PlayerMotor))]
 [RequireComponent(typeof(PlayerEffectController))]
@@ -64,6 +65,9 @@ public class PlayerController : MonoBehaviour
     public Transform CameraTarget => cameraTarget;
     public Transform VisualRoot => visualRoot;
     public Transform GroundCheck => groundCheck;
+
+    public PlayerId PlayerId => input.PlayerIndex == 0 ? PlayerId.Player1 : PlayerId.Player2;
+    public PlayerEffectController Effects => effects;
 
     private void Awake()
     {
@@ -143,6 +147,18 @@ public class PlayerController : MonoBehaviour
         State = PlayerState.Finished;
         motor.StopHorizontalMovement();
         effects.NotifyRoundEnd();
+    }
+
+    public void RespawnAt(Vector3 spawnPosition, Quaternion spawnRotation)
+    {
+        transform.SetPositionAndRotation(spawnPosition, spawnRotation);
+
+        motor.ResetVelocity();
+        input.ResetInput();
+
+        State = PlayerState.Normal;
+
+        RecalculateStats();
     }
 
     public void Stun(float duration)

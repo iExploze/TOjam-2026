@@ -86,9 +86,10 @@ public class PlayerEffectController : MonoBehaviour
         activeEffects.Clear();
 
         player.RecalculateStats();
-
+        /*
         if (logEffects)
             Debug.Log($"{player.name} cleared all effects.");
+        */
     }
 
     public void ModifyStats(PlayerStats stats)
