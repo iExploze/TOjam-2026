@@ -92,11 +92,20 @@ public class RoundManager : MonoBehaviour
         if (deadPlayer == null)
             return;
 
-        if (roundLocked || matchOver)
+        //Debug.Log($"PlayerDied called. Player={deadPlayer.name}, id={deadPlayer.PlayerId}, roundLocked={roundLocked}, matchOver={matchOver}, state={deadPlayer.State}");
+
+        if (matchOver)
             return;
 
+        if (deadPlayer.State != PlayerState.Normal)
+        {
+            //Debug.Log($"Death ignored because {deadPlayer.name} state is {deadPlayer.State}");
+            return;
+        }
+
         StartCoroutine(PlayerDeathRoutine(deadPlayer));
-        Debug.Log("triggered respawn for " + deadPlayer);
+
+        //Debug.Log("Triggered respawn for " + deadPlayer.name);
     }
 
     private IEnumerator RoundWinRoutine(PlayerController winner)
