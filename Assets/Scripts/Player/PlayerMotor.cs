@@ -165,6 +165,7 @@ public class PlayerMotor : MonoBehaviour
         if (groundCheck == null)
         {
             IsGrounded = false;
+            //Debug.LogWarning($"{name}: GroundCheck is missing.");
             return;
         }
 
@@ -174,6 +175,8 @@ public class PlayerMotor : MonoBehaviour
             groundLayer,
             QueryTriggerInteraction.Ignore
         );
+
+        //Debug.Log($"{name} grounded: {IsGrounded}");
     }
 
     private void OnDrawGizmosSelected()
