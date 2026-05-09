@@ -9,7 +9,7 @@ public class DeathZoneTrigger : MonoBehaviour
         if (player == null)
             return;
 
-        Debug.Log(player + "died");
+        //Debug.Log(player + "died");
         RoundManager.Instance.PlayerDied(player);
     }
 }

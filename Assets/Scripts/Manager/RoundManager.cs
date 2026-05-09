@@ -1,15 +1,6 @@
 using System.Collections;
-using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
-using UnityEngine.InputSystem;
-
-[System.Serializable]
-public class EffectCardDefinition
-{
-    public EffectType effectType;
-    public PlayerEffect effectAsset;
-}
 
 public class RoundManager : MonoBehaviour
 {
@@ -25,31 +16,21 @@ public class RoundManager : MonoBehaviour
 
     [Header("Match Settings")]
     [SerializeField] private int pointsToWin = 10;
-    [SerializeField] private int roundCountdownSeconds = 3;
     [SerializeField] private int deathRespawnSeconds = 2;
-    [SerializeField] private float postRoundPause = 0.75f;
+    [SerializeField] private float roundOverScreenTime = 3f;
     [SerializeField] private float matchEndPause = 3f;
-
-    [Header("Effect Cards")]
-    [SerializeField] private List<EffectCardDefinition> hazardPool = new List<EffectCardDefinition>();
 
     [Header("UI")]
     [SerializeField] private TMP_Text scoreText;
     [SerializeField] private TMP_Text messageText;
-    [SerializeField] private TMP_Text countdownText;
-    [SerializeField] private TMP_Text effectChoiceText;
+    [SerializeField] private RoundOverOverlayUI roundOverOverlayUI;
+    [SerializeField] private PlayerDeathOverlayUI deathOverlayUI;
 
     private int p1Score;
     private int p2Score;
 
     private bool roundLocked;
     private bool matchOver;
-    private bool choosingEffect;
-
-    private readonly List<EffectCardDefinition> currentChoices = new List<EffectCardDefinition>();
-
-    private int selectedChoiceIndex;
-    private EffectCardDefinition selectedEffectCard;
 
     private void Awake()
     {
@@ -67,13 +48,7 @@ public class RoundManager : MonoBehaviour
         UpdateScoreUI();
         ClearTemporaryUI();
 
-        StartCoroutine(StartRoundRoutine());
-    }
-
-    private void Update()
-    {
-        if (choosingEffect)
-            HandleEffectSelectionInput();
+        StartRound();
     }
 
     public void PlayerFinished(PlayerController finishingPlayer)
@@ -92,20 +67,13 @@ public class RoundManager : MonoBehaviour
         if (deadPlayer == null)
             return;
 
-        //Debug.Log($"PlayerDied called. Player={deadPlayer.name}, id={deadPlayer.PlayerId}, roundLocked={roundLocked}, matchOver={matchOver}, state={deadPlayer.State}");
-
-        if (matchOver)
+        if (matchOver || roundLocked)
             return;
 
         if (deadPlayer.State != PlayerState.Normal)
-        {
-            //Debug.Log($"Death ignored because {deadPlayer.name} state is {deadPlayer.State}");
             return;
-        }
 
         StartCoroutine(PlayerDeathRoutine(deadPlayer));
-
-        //Debug.Log("Triggered respawn for " + deadPlayer.name);
     }
 
     private IEnumerator RoundWinRoutine(PlayerController winner)
@@ -126,16 +94,14 @@ public class RoundManager : MonoBehaviour
 
         UpdateScoreUI();
 
-        SetMessage($"{GetPlayerName(winner)} wins the round!");
-
-        yield return new WaitForSeconds(postRoundPause);
-
         if (p1Score >= pointsToWin || p2Score >= pointsToWin)
         {
             matchOver = true;
 
+            if (roundOverOverlayUI != null)
+                roundOverOverlayUI.ShowMatchOver(winner.PlayerId);
+
             SetMessage($"{GetPlayerName(winner)} wins the experiment!");
-            SetEffectChoice("");
 
             yield return new WaitForSeconds(matchEndPause);
 
@@ -143,242 +109,63 @@ public class RoundManager : MonoBehaviour
             yield break;
         }
 
-        yield return EffectChoiceRoutine(loser, winner);
+        if (roundOverOverlayUI != null)
+            roundOverOverlayUI.ShowRoundOver(winner.PlayerId);
 
-        PlayerEffect chosenEffect = selectedEffectCard != null
-            ? selectedEffectCard.effectAsset
-            : null;
+        SetMessage($"{GetPlayerName(winner)} wins the round!");
 
-        string chosenEffectName = chosenEffect != null
-            ? chosenEffect.effectName
-            : "No Effect";
+        yield return new WaitForSeconds(roundOverScreenTime);
 
-        SetMessage($"{GetPlayerName(loser)} chose {chosenEffectName} for {GetPlayerName(winner)}!");
-
-        yield return new WaitForSeconds(1f);
-
-        yield return ResetRoundWithCountdownRoutine(winner, chosenEffect);
-    }
-
-    private IEnumerator EffectChoiceRoutine(PlayerController chooser, PlayerController target)
-    {
-        PickRandomEffectChoices();
-
-        selectedChoiceIndex = 0;
-
-        if (currentChoices.Count > 0)
-            selectedEffectCard = currentChoices[selectedChoiceIndex];
-        else
-            selectedEffectCard = null;
-
-        choosingEffect = true;
-
-        SetMessage($"{GetPlayerName(chooser)}, choose a curse for {GetPlayerName(target)}");
-        RefreshEffectChoiceUI();
-
-        while (choosingEffect)
-            yield return null;
-
-        SetEffectChoice("");
-    }
-
-    private IEnumerator ResetRoundWithCountdownRoutine(PlayerController cursedPlayer, PlayerEffect curseEffect)
-    {
-        ClearAllPlayerEffects();
-
-        if (cursedPlayer != null && curseEffect != null)
-            cursedPlayer.Effects.AddEffect(curseEffect);
+        if (roundOverOverlayUI != null)
+            roundOverOverlayUI.Hide();
 
         ResetBothPlayersForRound();
 
-        SetMessage("Next test begins...");
-        SetEffectChoice("");
-
-        for (int i = roundCountdownSeconds; i > 0; i--)
-        {
-            SetCountdown(i.ToString());
-            yield return new WaitForSeconds(1f);
-        }
-
-        SetCountdown("");
-        SetMessage("GO!");
+        SetMessage("");
 
         roundLocked = false;
-
-        yield return new WaitForSeconds(1f);
-
-        SetMessage("");
-    }
-
-    private IEnumerator StartRoundRoutine()
-    {
-        roundLocked = true;
-
-        ClearAllPlayerEffects();
-        ResetBothPlayersForRound();
-
-        SetMessage("Get ready!");
-
-        for (int i = roundCountdownSeconds; i > 0; i--)
-        {
-            SetCountdown(i.ToString());
-            yield return new WaitForSeconds(1f);
-        }
-
-        SetCountdown("");
-        SetMessage("GO!");
-
-        roundLocked = false;
-
-        yield return new WaitForSeconds(1f);
-
-        SetMessage("");
     }
 
     private IEnumerator PlayerDeathRoutine(PlayerController deadPlayer)
     {
         deadPlayer.SetState(PlayerState.Disabled);
 
-        SetMessage($"{GetPlayerName(deadPlayer)} got lab-tested...");
-
         for (int i = deathRespawnSeconds; i > 0; i--)
         {
-            SetCountdown($"{GetPlayerName(deadPlayer)} respawns in {i}");
+            if (deathOverlayUI != null)
+                deathOverlayUI.ShowRespawn(deadPlayer.PlayerId, i);
+
             yield return new WaitForSeconds(1f);
         }
-
-        SetCountdown("");
 
         Transform spawn = GetSpawn(deadPlayer);
 
         if (spawn != null)
             deadPlayer.RespawnAt(spawn.position, spawn.rotation);
 
-        SetMessage("");
+        if (deathOverlayUI != null)
+            deathOverlayUI.HideRespawn(deadPlayer.PlayerId);
     }
 
-    private void HandleEffectSelectionInput()
+    private void StartRound()
     {
-        Keyboard keyboard = Keyboard.current;
+        roundLocked = false;
+        matchOver = false;
 
-        if (keyboard == null)
-            return;
-
-        bool leftPressed =
-            keyboard.aKey.wasPressedThisFrame ||
-            keyboard.leftArrowKey.wasPressedThisFrame;
-
-        bool rightPressed =
-            keyboard.dKey.wasPressedThisFrame ||
-            keyboard.rightArrowKey.wasPressedThisFrame;
-
-        bool confirmPressed =
-            keyboard.spaceKey.wasPressedThisFrame ||
-            keyboard.leftCtrlKey.wasPressedThisFrame ||
-            keyboard.rightCtrlKey.wasPressedThisFrame;
-
-        if (currentChoices.Count == 0)
-        {
-            if (confirmPressed)
-                choosingEffect = false;
-
-            return;
-        }
-
-        if (leftPressed)
-        {
-            selectedChoiceIndex--;
-
-            if (selectedChoiceIndex < 0)
-                selectedChoiceIndex = currentChoices.Count - 1;
-
-            selectedEffectCard = currentChoices[selectedChoiceIndex];
-            RefreshEffectChoiceUI();
-        }
-
-        if (rightPressed)
-        {
-            selectedChoiceIndex++;
-
-            if (selectedChoiceIndex >= currentChoices.Count)
-                selectedChoiceIndex = 0;
-
-            selectedEffectCard = currentChoices[selectedChoiceIndex];
-            RefreshEffectChoiceUI();
-        }
-
-        if (confirmPressed)
-        {
-            selectedEffectCard = currentChoices[selectedChoiceIndex];
-            choosingEffect = false;
-        }
-    }
-
-    private void PickRandomEffectChoices()
-    {
-        currentChoices.Clear();
-
-        List<EffectCardDefinition> available = new List<EffectCardDefinition>();
-
-        foreach (EffectCardDefinition card in hazardPool)
-        {
-            if (card != null && card.effectAsset != null)
-                available.Add(card);
-        }
-
-        int choicesToPick = Mathf.Min(3, available.Count);
-
-        for (int i = 0; i < choicesToPick; i++)
-        {
-            int randomIndex = Random.Range(0, available.Count);
-
-            currentChoices.Add(available[randomIndex]);
-            available.RemoveAt(randomIndex);
-        }
-    }
-
-    private void RefreshEffectChoiceUI()
-    {
-        if (effectChoiceText == null)
-            return;
-
-        if (currentChoices.Count == 0)
-        {
-            effectChoiceText.text = "No effects available. Press Space or Ctrl to continue.";
-            return;
-        }
-
-        string text = "A/D or ←/→ to choose    Space/Ctrl to confirm\n\n";
-
-        for (int i = 0; i < currentChoices.Count; i++)
-        {
-            string effectName = currentChoices[i].effectAsset.effectName;
-
-            if (i == selectedChoiceIndex)
-                text += $"<b>[ {effectName} ]</b>   ";
-            else
-                text += $"{effectName}   ";
-        }
-
-        effectChoiceText.text = text;
+        ResetBothPlayersForRound();
+        ClearTemporaryUI();
     }
 
     private void ResetBothPlayersForRound()
     {
+        if (deathOverlayUI != null)
+            deathOverlayUI.HideAll();
+
         if (player1 != null && player1Spawn != null)
             player1.ResetForRound(player1Spawn.position, player1Spawn.rotation);
 
         if (player2 != null && player2Spawn != null)
             player2.ResetForRound(player2Spawn.position, player2Spawn.rotation);
-    }
-
-    private void ClearAllPlayerEffects()
-    {
-        if (player1 != null)
-            player1.Effects.ClearEffects();
-
-        if (player2 != null)
-            player2.Effects.ClearEffects();
     }
 
     private void ResetMatch()
@@ -387,11 +174,11 @@ public class RoundManager : MonoBehaviour
         p2Score = 0;
 
         matchOver = false;
+        roundLocked = false;
 
         UpdateScoreUI();
         ClearTemporaryUI();
-
-        StartCoroutine(StartRoundRoutine());
+        ResetBothPlayersForRound();
     }
 
     private PlayerController GetOtherPlayer(PlayerController player)
@@ -436,22 +223,14 @@ public class RoundManager : MonoBehaviour
             messageText.text = text;
     }
 
-    private void SetCountdown(string text)
-    {
-        if (countdownText != null)
-            countdownText.text = text;
-    }
-
-    private void SetEffectChoice(string text)
-    {
-        if (effectChoiceText != null)
-            effectChoiceText.text = text;
-    }
-
     private void ClearTemporaryUI()
     {
         SetMessage("");
-        SetCountdown("");
-        SetEffectChoice("");
+
+        if (roundOverOverlayUI != null)
+            roundOverOverlayUI.Hide();
+
+        if (deathOverlayUI != null)
+            deathOverlayUI.HideAll();
     }
 }
