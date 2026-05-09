@@ -1,6 +1,8 @@
 using System.Collections;
 using TMPro;
 using UnityEngine;
+using System.Collections.Generic;
+using UnityEngine.InputSystem;
 
 public class RoundManager : MonoBehaviour
 {
@@ -21,10 +23,18 @@ public class RoundManager : MonoBehaviour
     [SerializeField] private float matchEndPause = 3f;
 
     [Header("UI")]
-    [SerializeField] private TMP_Text scoreText;
-    [SerializeField] private TMP_Text messageText;
     [SerializeField] private RoundOverOverlayUI roundOverOverlayUI;
     [SerializeField] private PlayerDeathOverlayUI deathOverlayUI;
+    [SerializeField] private CardOverlayUI cardOverlayUI;
+
+    [Header("Effect Cards")]
+    [SerializeField] private List<EffectCardDefinition> hazardPool = new List<EffectCardDefinition>();
+
+    private bool choosingCard;
+    private readonly List<EffectCardDefinition> currentChoices = new List<EffectCardDefinition>();
+    private int selectedChoiceIndex;
+    private EffectCardDefinition selectedCard;
+    private PlayerId cardChooserId;
 
     private int p1Score;
     private int p2Score;
@@ -45,10 +55,15 @@ public class RoundManager : MonoBehaviour
 
     private void Start()
     {
-        UpdateScoreUI();
         ClearTemporaryUI();
 
         StartRound();
+    }
+
+    private void Update()
+    {
+        if (choosingCard)
+            HandleCardSelectionInput();
     }
 
     public void PlayerFinished(PlayerController finishingPlayer)
@@ -92,8 +107,6 @@ public class RoundManager : MonoBehaviour
         else
             p2Score++;
 
-        UpdateScoreUI();
-
         if (p1Score >= pointsToWin || p2Score >= pointsToWin)
         {
             matchOver = true;
@@ -101,27 +114,37 @@ public class RoundManager : MonoBehaviour
             if (roundOverOverlayUI != null)
                 roundOverOverlayUI.ShowMatchOver(winner.PlayerId);
 
-            SetMessage($"{GetPlayerName(winner)} wins the experiment!");
-
             yield return new WaitForSeconds(matchEndPause);
 
             ResetMatch();
             yield break;
         }
 
+        // 1. Show round over screen
         if (roundOverOverlayUI != null)
             roundOverOverlayUI.ShowRoundOver(winner.PlayerId);
-
-        SetMessage($"{GetPlayerName(winner)} wins the round!");
 
         yield return new WaitForSeconds(roundOverScreenTime);
 
         if (roundOverOverlayUI != null)
             roundOverOverlayUI.Hide();
 
-        ResetBothPlayersForRound();
+        // 2. Show card selection screen
+        if (selectedCard != null && selectedCard.effectAsset != null)
+            winner.Effects.AddEffect(selectedCard.effectAsset);
 
-        SetMessage("");
+        // 3. Hide card screen after selection
+        if (cardOverlayUI != null)
+            cardOverlayUI.Hide();
+
+        // 4. Apply selected card effect to the winner
+        ClearAllPlayerEffects();
+
+        if (selectedCard != null && selectedCard.effectAsset != null)
+            winner.Effects.AddEffect(selectedCard.effectAsset);
+
+        // 5. Reset and start next round
+        ResetBothPlayersForRound();
 
         roundLocked = false;
     }
@@ -176,7 +199,6 @@ public class RoundManager : MonoBehaviour
         matchOver = false;
         roundLocked = false;
 
-        UpdateScoreUI();
         ClearTemporaryUI();
         ResetBothPlayersForRound();
     }
@@ -211,26 +233,131 @@ public class RoundManager : MonoBehaviour
         return player.PlayerId == PlayerId.Player1 ? "Player 1" : "Player 2";
     }
 
-    private void UpdateScoreUI()
+    private IEnumerator CardChoiceRoutine(PlayerController chooser, PlayerController target)
     {
-        if (scoreText != null)
-            scoreText.text = $"P1: {p1Score}     P2: {p2Score}";
+        PickRandomCardChoices();
+
+        selectedChoiceIndex = 0;
+        selectedCard = currentChoices.Count > 0 ? currentChoices[0] : null;
+
+        cardChooserId = chooser.PlayerId;
+        choosingCard = true;
+
+        if (cardOverlayUI != null)
+            cardOverlayUI.Show(chooser.PlayerId, currentChoices, selectedChoiceIndex);
+
+        while (choosingCard)
+            yield return null;
     }
 
-    private void SetMessage(string text)
+    private void HandleCardSelectionInput()
     {
-        if (messageText != null)
-            messageText.text = text;
+        Keyboard keyboard = Keyboard.current;
+
+        if (keyboard == null)
+            return;
+
+        bool leftPressed = false;
+        bool rightPressed = false;
+        bool confirmPressed = false;
+
+        if (cardChooserId == PlayerId.Player1)
+        {
+            // Player 1 card controls
+            leftPressed = keyboard.aKey.wasPressedThisFrame;
+            rightPressed = keyboard.dKey.wasPressedThisFrame;
+            confirmPressed = keyboard.spaceKey.wasPressedThisFrame || keyboard.leftCtrlKey.wasPressedThisFrame;
+        }
+        else if (cardChooserId == PlayerId.Player2)
+        {
+            // Player 2 card controls
+            leftPressed = keyboard.leftArrowKey.wasPressedThisFrame;
+            rightPressed = keyboard.rightArrowKey.wasPressedThisFrame;
+            confirmPressed = keyboard.rightCtrlKey.wasPressedThisFrame || keyboard.enterKey.wasPressedThisFrame;
+        }
+
+        if (currentChoices.Count == 0)
+        {
+            if (confirmPressed)
+                choosingCard = false;
+
+            return;
+        }
+
+        if (leftPressed)
+        {
+            selectedChoiceIndex--;
+
+            if (selectedChoiceIndex < 0)
+                selectedChoiceIndex = currentChoices.Count - 1;
+
+            selectedCard = currentChoices[selectedChoiceIndex];
+
+            if (cardOverlayUI != null)
+                cardOverlayUI.UpdateSelection(currentChoices, selectedChoiceIndex);
+        }
+
+        if (rightPressed)
+        {
+            selectedChoiceIndex++;
+
+            if (selectedChoiceIndex >= currentChoices.Count)
+                selectedChoiceIndex = 0;
+
+            selectedCard = currentChoices[selectedChoiceIndex];
+
+            if (cardOverlayUI != null)
+                cardOverlayUI.UpdateSelection(currentChoices, selectedChoiceIndex);
+        }
+
+        if (confirmPressed)
+        {
+            selectedCard = currentChoices[selectedChoiceIndex];
+            choosingCard = false;
+        }
+    }
+
+    private void PickRandomCardChoices()
+    {
+        currentChoices.Clear();
+
+        List<EffectCardDefinition> available = new List<EffectCardDefinition>();
+
+        foreach (EffectCardDefinition card in hazardPool)
+        {
+            if (card != null)
+                available.Add(card);
+        }
+
+        int choicesToPick = Mathf.Min(3, available.Count);
+
+        for (int i = 0; i < choicesToPick; i++)
+        {
+            int randomIndex = Random.Range(0, available.Count);
+
+            currentChoices.Add(available[randomIndex]);
+            available.RemoveAt(randomIndex);
+        }
+    }
+
+    private void ClearAllPlayerEffects()
+    {
+        if (player1 != null)
+            player1.Effects.ClearEffects();
+
+        if (player2 != null)
+            player2.Effects.ClearEffects();
     }
 
     private void ClearTemporaryUI()
     {
-        SetMessage("");
-
         if (roundOverOverlayUI != null)
             roundOverOverlayUI.Hide();
 
         if (deathOverlayUI != null)
             deathOverlayUI.HideAll();
+
+        if (cardOverlayUI != null)
+            cardOverlayUI.Hide();
     }
 }
