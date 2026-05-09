@@ -120,7 +120,6 @@ public class RoundManager : MonoBehaviour
             yield break;
         }
 
-        // 1. Show round over screen
         if (roundOverOverlayUI != null)
             roundOverOverlayUI.ShowRoundOver(winner.PlayerId);
 
@@ -129,23 +128,31 @@ public class RoundManager : MonoBehaviour
         if (roundOverOverlayUI != null)
             roundOverOverlayUI.Hide();
 
-        // 2. Show card selection screen
-        if (selectedCard != null && selectedCard.effectAsset != null)
-            winner.Effects.AddEffect(selectedCard.effectAsset);
+        // This was missing.
+        yield return CardChoiceRoutine(loser, winner);
 
-        // 3. Hide card screen after selection
         if (cardOverlayUI != null)
             cardOverlayUI.Hide();
 
-        // 4. Apply selected card effect to the winner
+        yield return StartNextRoundAfterCardRoutine(winner);
+    }
+
+    private IEnumerator StartNextRoundAfterCardRoutine(PlayerController cursedWinner)
+    {
+        // Remove old round effects.
         ClearAllPlayerEffects();
 
-        if (selectedCard != null && selectedCard.effectAsset != null)
-            winner.Effects.AddEffect(selectedCard.effectAsset);
-
-        // 5. Reset and start next round
+        // Reset positions/states first.
         ResetBothPlayersForRound();
 
+        // Let Unity process the transform/state reset for one frame.
+        yield return null;
+
+        // Apply the selected curse to the winner for the new round.
+        if (selectedCard != null && selectedCard.effectAsset != null && cursedWinner != null)
+            cursedWinner.Effects.AddEffect(selectedCard.effectAsset);
+
+        // Start accepting finish/death triggers again.
         roundLocked = false;
     }
 

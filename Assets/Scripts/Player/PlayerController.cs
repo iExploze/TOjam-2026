@@ -129,17 +129,15 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    public void ResetForRound(Vector3 spawnPosition, Quaternion spawnRotation)
+    public void ResetForRound(Vector3 position, Quaternion rotation)
     {
-        transform.SetPositionAndRotation(spawnPosition, spawnRotation);
+        transform.position = position;
+        transform.rotation = rotation;
 
-        motor.ResetVelocity();
-        input.ResetInput();
-
-        State = PlayerState.Normal;
+        // Very important:
+        SetState(PlayerState.Normal);
 
         RecalculateStats();
-        effects.NotifyRoundStart();
     }
 
     public void FinishRound()
