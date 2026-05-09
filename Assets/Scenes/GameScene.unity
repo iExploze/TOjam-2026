@@ -1179,7 +1179,7 @@ MonoBehaviour:
   groundLayer:
     serializedVersion: 2
     m_Bits: 131072
-  groundCheckRadius: 0.3
+  groundCheckRadius: 0.4
   useWorldMovement: 1
   cameraTransform: {fileID: 4751203}
 --- !u!114 &2055354480
@@ -1223,7 +1223,7 @@ MonoBehaviour:
     moveSpeed: 10
     acceleration: 85
     deceleration: 70
-    airControl: 0.2
+    airControl: 0.4
     jumpForce: 12.5
     extraGravity: 14
     rotationSpeed: 18

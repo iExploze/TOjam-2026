@@ -11,10 +11,6 @@ public class PlayerMotor : MonoBehaviour
     [SerializeField] private LayerMask groundLayer;
     [SerializeField] private float groundCheckRadius = 0.22f;
 
-    [Header("Movement Direction")]
-    [SerializeField] private bool useWorldMovement = true;
-    [SerializeField] private Transform cameraTransform;
-
     public bool IsGrounded { get; private set; }
     public Vector3 LastMoveDirection { get; private set; }
 
@@ -128,22 +124,9 @@ public class PlayerMotor : MonoBehaviour
         if (input.sqrMagnitude < 0.01f)
             return Vector3.zero;
 
-        if (useWorldMovement || cameraTransform == null)
-        {
+
             return new Vector3(input.x, 0f, input.y).normalized;
-        }
-
-        Vector3 cameraForward = cameraTransform.forward;
-        Vector3 cameraRight = cameraTransform.right;
-
-        cameraForward.y = 0f;
-        cameraRight.y = 0f;
-
-        cameraForward.Normalize();
-        cameraRight.Normalize();
-
-        Vector3 direction = cameraRight * input.x + cameraForward * input.y;
-        return direction.normalized;
+        
     }
 
     private void RotateTowardMovement(Vector3 moveDirection, PlayerStats stats)
