@@ -46,6 +46,14 @@ public class RoundManager : MonoBehaviour
     private bool roundLocked;
     private bool matchOver;
 
+    private Vector3 player1RespawnPosition;
+    private Quaternion player1RespawnRotation;
+    private bool player1HasRespawnPoint;
+
+    private Vector3 player2RespawnPosition;
+    private Quaternion player2RespawnRotation;
+    private bool player2HasRespawnPoint;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -100,6 +108,27 @@ public class RoundManager : MonoBehaviour
             return;
 
         StartCoroutine(PlayerDeathRoutine(deadPlayer));
+    }
+
+    public void SetCheckpoint(PlayerController player, Vector3 position, Quaternion rotation)
+    {
+        if (player == null)
+            return;
+
+        if (player == player1)
+        {
+            player1RespawnPosition = position;
+            player1RespawnRotation = rotation;
+            player1HasRespawnPoint = true;
+            return;
+        }
+
+        if (player == player2)
+        {
+            player2RespawnPosition = position;
+            player2RespawnRotation = rotation;
+            player2HasRespawnPoint = true;
+        }
     }
 
     private void DisablePlayerMovement()
@@ -250,10 +279,8 @@ public class RoundManager : MonoBehaviour
             yield return new WaitForSeconds(1f);
         }
 
-        Transform spawn = GetSpawn(deadPlayer);
-
-        if (spawn != null)
-            deadPlayer.RespawnAt(spawn.position, spawn.rotation);
+        if (TryGetRespawnPoint(deadPlayer, out Vector3 respawnPosition, out Quaternion respawnRotation))
+            deadPlayer.RespawnAt(respawnPosition, respawnRotation);
 
         if (deathOverlayUI != null)
             deathOverlayUI.HideRespawn(deadPlayer.PlayerId);
@@ -273,11 +300,13 @@ public class RoundManager : MonoBehaviour
         if (deathOverlayUI != null)
             deathOverlayUI.HideAll();
 
-        if (player1 != null && player1Spawn != null)
-            player1.ResetForRound(player1Spawn.position, player1Spawn.rotation);
+        ResetRespawnPointsToSpawns();
 
-        if (player2 != null && player2Spawn != null)
-            player2.ResetForRound(player2Spawn.position, player2Spawn.rotation);
+        if (player1 != null && player1HasRespawnPoint)
+            player1.ResetForRound(player1RespawnPosition, player1RespawnRotation);
+
+        if (player2 != null && player2HasRespawnPoint)
+            player2.ResetForRound(player2RespawnPosition, player2RespawnRotation);
     }
 
     private void ResetMatch()
@@ -305,15 +334,50 @@ public class RoundManager : MonoBehaviour
         return null;
     }
 
-    private Transform GetSpawn(PlayerController player)
+    private void ResetRespawnPointsToSpawns()
     {
-        if (player == player1)
-            return player1Spawn;
+        if (player1Spawn != null)
+        {
+            player1RespawnPosition = player1Spawn.position;
+            player1RespawnRotation = player1Spawn.rotation;
+            player1HasRespawnPoint = true;
+        }
+        else
+        {
+            player1HasRespawnPoint = false;
+        }
 
-        if (player == player2)
-            return player2Spawn;
+        if (player2Spawn != null)
+        {
+            player2RespawnPosition = player2Spawn.position;
+            player2RespawnRotation = player2Spawn.rotation;
+            player2HasRespawnPoint = true;
+        }
+        else
+        {
+            player2HasRespawnPoint = false;
+        }
+    }
 
-        return null;
+    private bool TryGetRespawnPoint(PlayerController player, out Vector3 position, out Quaternion rotation)
+    {
+        if (player == player1 && player1HasRespawnPoint)
+        {
+            position = player1RespawnPosition;
+            rotation = player1RespawnRotation;
+            return true;
+        }
+
+        if (player == player2 && player2HasRespawnPoint)
+        {
+            position = player2RespawnPosition;
+            rotation = player2RespawnRotation;
+            return true;
+        }
+
+        position = Vector3.zero;
+        rotation = Quaternion.identity;
+        return false;
     }
 
     private string GetPlayerName(PlayerController player)
