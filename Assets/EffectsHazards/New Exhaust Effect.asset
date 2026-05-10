@@ -12,8 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1b07747e3edc3464ca9dba5357e5bddb, type: 3}
   m_Name: New Exhaust Effect
   m_EditorClassIdentifier: Assembly-CSharp::ExhaustEffect
-  effectName: 
+  effectName: Exhaust
   description: 
+  hudIcon: {fileID: 21300000, guid: 76303571e94d0ee4a9f07b854121c089, type: 3}
+  showOnHud: 1
   minStaminaMoveMultiplier: 0.2
   minStaminaAccelerationMultiplier: 0.22
   minStaminaDecelerationMultiplier: 0.8

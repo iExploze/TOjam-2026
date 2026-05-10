@@ -88,5 +88,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f738b9c78c46d4f46b680be62d57ef89, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerEffectHudSlotUI
-  cardImage: {fileID: 0}
+  cardImage: {fileID: 1983292148820170778}
   optionalNameText: {fileID: 0}

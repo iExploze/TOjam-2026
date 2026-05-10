@@ -136,6 +136,14 @@ public class PlayerController : MonoBehaviour
         return transform.forward;
     }
 
+    public float GetHorizontalSpeed()
+    {
+        if (motor == null)
+            return 0f;
+
+        return motor.GetHorizontalSpeed();
+    }
+
     public void SetState(PlayerState newState)
     {
         State = newState;
