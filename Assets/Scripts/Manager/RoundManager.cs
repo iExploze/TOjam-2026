@@ -29,6 +29,7 @@ public class RoundManager : MonoBehaviour
     [SerializeField] private PlayerDeathOverlayUI deathOverlayUI;
     [SerializeField] private CardOverlayUI cardOverlayUI;
     [SerializeField] private CountdownOverlayUI countdownOverlayUI;
+    [SerializeField] private ScoreMeterUI scoreMeterUI;
 
     [Header("Effect Cards")]
     [SerializeField] private List<EffectCardDefinition> hazardPool = new List<EffectCardDefinition>();
@@ -58,6 +59,7 @@ public class RoundManager : MonoBehaviour
 
     private void Start()
     {
+        UpdateScoreMeter();
         ClearTemporaryUI();
 
         StartRound();
@@ -67,6 +69,12 @@ public class RoundManager : MonoBehaviour
     {
         if (choosingCard)
             HandleCardSelectionInput();
+    }
+
+    private void UpdateScoreMeter()
+    {
+        if (scoreMeterUI != null)
+            scoreMeterUI.SetScore(p1Score, p2Score);
     }
 
     public void PlayerFinished(PlayerController finishingPlayer)
@@ -131,20 +139,37 @@ public class RoundManager : MonoBehaviour
         else
             p2Score++;
 
+        UpdateScoreMeter();
+
         if (p1Score >= pointsToWin || p2Score >= pointsToWin)
         {
             matchOver = true;
+            roundLocked = true;
+            choosingCard = false;
+
+            DisablePlayerMovement();
+
+            if (cardOverlayUI != null)
+                cardOverlayUI.Hide();
+
+            if (countdownOverlayUI != null)
+                countdownOverlayUI.Hide();
+
+            if (deathOverlayUI != null)
+                deathOverlayUI.HideAll();
 
             if (roundOverOverlayUI != null)
                 roundOverOverlayUI.ShowMatchOver(winner.PlayerId);
 
-            yield return new WaitForSeconds(matchEndPause);
+            Time.timeScale = 0f;
 
-            ResetMatch();
             yield break;
         }
 
         // 1. Winner screen
+        if (scoreMeterUI != null)
+            scoreMeterUI.Hide();
+
         if (roundOverOverlayUI != null)
             roundOverOverlayUI.ShowRoundOver(winner.PlayerId);
 
@@ -171,12 +196,21 @@ public class RoundManager : MonoBehaviour
         if (cardOverlayUI != null)
             cardOverlayUI.Hide();
 
+        if (countdownOverlayUI != null)
+            countdownOverlayUI.Hide();
+
         ClearAllPlayerEffects();
 
+        // Reset positions.
         ResetBothPlayersForRound();
 
+        // Wait one physics step so Rigidbody teleport actually settles.
+        yield return new WaitForFixedUpdate();
+
+        // Freeze players during countdown.
         DisablePlayerMovement();
 
+        // Apply selected curse to the previous winner.
         if (selectedCard != null && selectedCard.effectAsset != null && cursedWinner != null)
             cursedWinner.Effects.AddEffect(selectedCard.effectAsset);
 
@@ -197,6 +231,9 @@ public class RoundManager : MonoBehaviour
             countdownOverlayUI.Hide();
 
         EnablePlayerMovement();
+
+        if (scoreMeterUI != null)
+            scoreMeterUI.Show();
 
         roundLocked = false;
     }
@@ -247,6 +284,8 @@ public class RoundManager : MonoBehaviour
     {
         p1Score = 0;
         p2Score = 0;
+
+        UpdateScoreMeter();
 
         matchOver = false;
         roundLocked = false;
@@ -414,5 +453,8 @@ public class RoundManager : MonoBehaviour
 
         if (countdownOverlayUI != null)
             countdownOverlayUI.Hide();
+
+        if (scoreMeterUI != null)
+            scoreMeterUI.Show();
     }
 }

@@ -119,6 +119,23 @@ public class PlayerMotor : MonoBehaviour
         );
     }
 
+    public void TeleportTo(Vector3 position, Quaternion rotation)
+    {
+        if (rb == null)
+            rb = GetComponent<Rigidbody>();
+
+        rb.linearVelocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
+
+        rb.position = position;
+        rb.rotation = rotation;
+
+        transform.SetPositionAndRotation(position, rotation);
+
+        rb.Sleep();
+        rb.WakeUp();
+    }
+
     private Vector3 GetMoveDirection(Vector2 input)
     {
         if (input.sqrMagnitude < 0.01f)
