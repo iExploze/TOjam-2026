@@ -34,6 +34,10 @@ public class RoundManager : MonoBehaviour
     [Header("Effect Cards")]
     [SerializeField] private List<EffectCardDefinition> hazardPool = new List<EffectCardDefinition>();
 
+    [Header("Debug Card Selection")]
+    [SerializeField] private bool debugForceCardInChoices;
+    [SerializeField] private int debugForcedHazardPoolIndex;
+
     private bool choosingCard;
     private readonly List<EffectCardDefinition> currentChoices = new List<EffectCardDefinition>();
     private int selectedChoiceIndex;
@@ -484,15 +488,35 @@ public class RoundManager : MonoBehaviour
                 available.Add(card);
         }
 
-        int choicesToPick = Mathf.Min(3, available.Count);
+        if (debugForceCardInChoices && TryGetDebugForcedCardFromPool(out EffectCardDefinition debugForcedCard))
+        {
+            currentChoices.Add(debugForcedCard);
+            available.RemoveAll(card => card == debugForcedCard);
+        }
 
-        for (int i = 0; i < choicesToPick; i++)
+        int choicesToPick = Mathf.Min(3, currentChoices.Count + available.Count);
+
+        while (currentChoices.Count < choicesToPick && available.Count > 0)
         {
             int randomIndex = Random.Range(0, available.Count);
 
             currentChoices.Add(available[randomIndex]);
             available.RemoveAt(randomIndex);
         }
+    }
+
+    private bool TryGetDebugForcedCardFromPool(out EffectCardDefinition forcedCard)
+    {
+        forcedCard = null;
+
+        if (hazardPool == null || hazardPool.Count == 0)
+            return false;
+
+        if (debugForcedHazardPoolIndex < 0 || debugForcedHazardPoolIndex >= hazardPool.Count)
+            return false;
+
+        forcedCard = hazardPool[debugForcedHazardPoolIndex];
+        return forcedCard != null;
     }
 
     private void ClearAllPlayerEffects()

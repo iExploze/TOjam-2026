@@ -108,6 +108,10 @@ public class PlayerController : MonoBehaviour
             return;
 
         effects.TickEffects(Time.fixedDeltaTime);
+
+        if (State != PlayerState.Normal)
+            return;
+
         motor.Move(input.MoveInput, CurrentStats);
         motor.ApplyExtraGravity(CurrentStats);
     }
@@ -116,6 +120,20 @@ public class PlayerController : MonoBehaviour
     {
         CurrentStats = baseStats.Clone();
         effects.ModifyStats(CurrentStats);
+    }
+
+    public void ApplyExternalForce(Vector3 force, ForceMode forceMode = ForceMode.Impulse)
+    {
+        if (motor != null)
+            motor.AddExternalForce(force, forceMode);
+    }
+
+    public Vector3 GetLastMoveDirection()
+    {
+        if (motor != null && motor.LastMoveDirection.sqrMagnitude > 0.01f)
+            return motor.LastMoveDirection.normalized;
+
+        return transform.forward;
     }
 
     public void SetState(PlayerState newState)
