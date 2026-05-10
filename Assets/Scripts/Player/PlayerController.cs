@@ -133,10 +133,13 @@ public class PlayerController : MonoBehaviour
 
     public void ResetForRound(Vector3 position, Quaternion rotation)
     {
-        transform.SetPositionAndRotation(position, rotation);
+        if (motor != null)
+            motor.TeleportTo(position, rotation);
+        else
+            transform.SetPositionAndRotation(position, rotation);
 
-        motor.ResetVelocity();
-        input.ResetInput();
+        if (input != null)
+            input.ResetInput();
 
         RecalculateStats();
         SetState(PlayerState.Normal);
@@ -154,10 +157,13 @@ public class PlayerController : MonoBehaviour
 
     public void RespawnAt(Vector3 spawnPosition, Quaternion spawnRotation)
     {
-        transform.SetPositionAndRotation(spawnPosition, spawnRotation);
+        if (motor != null)
+            motor.TeleportTo(spawnPosition, spawnRotation);
+        else
+            transform.SetPositionAndRotation(spawnPosition, spawnRotation);
 
-        motor.ResetVelocity();
-        input.ResetInput();
+        if (input != null)
+            input.ResetInput();
 
         RecalculateStats();
         SetState(PlayerState.Normal);

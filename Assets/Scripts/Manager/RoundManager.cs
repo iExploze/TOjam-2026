@@ -21,11 +21,15 @@ public class RoundManager : MonoBehaviour
     [SerializeField] private int deathRespawnSeconds = 2;
     [SerializeField] private float roundOverScreenTime = 3f;
     [SerializeField] private float matchEndPause = 3f;
+    [SerializeField] private int roundStartCountdownSeconds = 3;
+    [SerializeField] private float goScreenTime = 0.5f;
 
     [Header("UI")]
     [SerializeField] private RoundOverOverlayUI roundOverOverlayUI;
     [SerializeField] private PlayerDeathOverlayUI deathOverlayUI;
     [SerializeField] private CardOverlayUI cardOverlayUI;
+    [SerializeField] private CountdownOverlayUI countdownOverlayUI;
+    [SerializeField] private ScoreMeterUI scoreMeterUI;
 
     [Header("Effect Cards")]
     [SerializeField] private List<EffectCardDefinition> hazardPool = new List<EffectCardDefinition>();
@@ -55,6 +59,7 @@ public class RoundManager : MonoBehaviour
 
     private void Start()
     {
+        UpdateScoreMeter();
         ClearTemporaryUI();
 
         StartRound();
@@ -64,6 +69,12 @@ public class RoundManager : MonoBehaviour
     {
         if (choosingCard)
             HandleCardSelectionInput();
+    }
+
+    private void UpdateScoreMeter()
+    {
+        if (scoreMeterUI != null)
+            scoreMeterUI.SetScore(p1Score, p2Score);
     }
 
     public void PlayerFinished(PlayerController finishingPlayer)
@@ -91,34 +102,73 @@ public class RoundManager : MonoBehaviour
         StartCoroutine(PlayerDeathRoutine(deadPlayer));
     }
 
+    private void DisablePlayerMovement()
+    {
+        if (player1 != null)
+            player1.FinishRound();
+
+        if (player2 != null)
+            player2.FinishRound();
+    }
+
+    private void EnablePlayerMovement()
+    {
+        if (player1 != null)
+        {
+            player1.Effects.NotifyRoundStart();
+            player1.SetState(PlayerState.Normal);
+        }
+
+        if (player2 != null)
+        {
+            player2.Effects.NotifyRoundStart();
+            player2.SetState(PlayerState.Normal);
+        }
+    }
+
     private IEnumerator RoundWinRoutine(PlayerController winner)
     {
         roundLocked = true;
 
         PlayerController loser = GetOtherPlayer(winner);
 
-        winner.FinishRound();
-
-        if (loser != null)
-            loser.FinishRound();
+        DisablePlayerMovement();
 
         if (winner.PlayerId == PlayerId.Player1)
             p1Score++;
         else
             p2Score++;
 
+        UpdateScoreMeter();
+
         if (p1Score >= pointsToWin || p2Score >= pointsToWin)
         {
             matchOver = true;
+            roundLocked = true;
+            choosingCard = false;
+
+            DisablePlayerMovement();
+
+            if (cardOverlayUI != null)
+                cardOverlayUI.Hide();
+
+            if (countdownOverlayUI != null)
+                countdownOverlayUI.Hide();
+
+            if (deathOverlayUI != null)
+                deathOverlayUI.HideAll();
 
             if (roundOverOverlayUI != null)
                 roundOverOverlayUI.ShowMatchOver(winner.PlayerId);
 
-            yield return new WaitForSeconds(matchEndPause);
+            Time.timeScale = 0f;
 
-            ResetMatch();
             yield break;
         }
+
+        // 1. Winner screen
+        if (scoreMeterUI != null)
+            scoreMeterUI.Hide();
 
         if (roundOverOverlayUI != null)
             roundOverOverlayUI.ShowRoundOver(winner.PlayerId);
@@ -128,31 +178,63 @@ public class RoundManager : MonoBehaviour
         if (roundOverOverlayUI != null)
             roundOverOverlayUI.Hide();
 
-        // This was missing.
+        // 2. Card selection screen
         yield return CardChoiceRoutine(loser, winner);
 
         if (cardOverlayUI != null)
             cardOverlayUI.Hide();
 
-        yield return StartNextRoundAfterCardRoutine(winner);
+        // 3. Reset players, freeze them, countdown, then unlock movement
+        yield return StartNextRoundWithCountdownRoutine(winner);
     }
 
-    private IEnumerator StartNextRoundAfterCardRoutine(PlayerController cursedWinner)
+    private IEnumerator StartNextRoundWithCountdownRoutine(PlayerController cursedWinner)
     {
-        // Remove old round effects.
+        if (roundOverOverlayUI != null)
+            roundOverOverlayUI.Hide();
+
+        if (cardOverlayUI != null)
+            cardOverlayUI.Hide();
+
+        if (countdownOverlayUI != null)
+            countdownOverlayUI.Hide();
+
         ClearAllPlayerEffects();
 
-        // Reset positions/states first.
+        // Reset positions.
         ResetBothPlayersForRound();
 
-        // Let Unity process the transform/state reset for one frame.
-        yield return null;
+        // Wait one physics step so Rigidbody teleport actually settles.
+        yield return new WaitForFixedUpdate();
 
-        // Apply the selected curse to the winner for the new round.
+        // Freeze players during countdown.
+        DisablePlayerMovement();
+
+        // Apply selected curse to the previous winner.
         if (selectedCard != null && selectedCard.effectAsset != null && cursedWinner != null)
             cursedWinner.Effects.AddEffect(selectedCard.effectAsset);
 
-        // Start accepting finish/death triggers again.
+        for (int i = roundStartCountdownSeconds; i > 0; i--)
+        {
+            if (countdownOverlayUI != null)
+                countdownOverlayUI.ShowNumber(i);
+
+            yield return new WaitForSeconds(1f);
+        }
+
+        if (countdownOverlayUI != null)
+            countdownOverlayUI.ShowGo();
+
+        yield return new WaitForSeconds(goScreenTime);
+
+        if (countdownOverlayUI != null)
+            countdownOverlayUI.Hide();
+
+        EnablePlayerMovement();
+
+        if (scoreMeterUI != null)
+            scoreMeterUI.Show();
+
         roundLocked = false;
     }
 
@@ -202,6 +284,8 @@ public class RoundManager : MonoBehaviour
     {
         p1Score = 0;
         p2Score = 0;
+
+        UpdateScoreMeter();
 
         matchOver = false;
         roundLocked = false;
@@ -366,5 +450,11 @@ public class RoundManager : MonoBehaviour
 
         if (cardOverlayUI != null)
             cardOverlayUI.Hide();
+
+        if (countdownOverlayUI != null)
+            countdownOverlayUI.Hide();
+
+        if (scoreMeterUI != null)
+            scoreMeterUI.Show();
     }
 }
