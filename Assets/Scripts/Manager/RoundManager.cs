@@ -21,11 +21,14 @@ public class RoundManager : MonoBehaviour
     [SerializeField] private int deathRespawnSeconds = 2;
     [SerializeField] private float roundOverScreenTime = 3f;
     [SerializeField] private float matchEndPause = 3f;
+    [SerializeField] private int roundStartCountdownSeconds = 3;
+    [SerializeField] private float goScreenTime = 0.5f;
 
     [Header("UI")]
     [SerializeField] private RoundOverOverlayUI roundOverOverlayUI;
     [SerializeField] private PlayerDeathOverlayUI deathOverlayUI;
     [SerializeField] private CardOverlayUI cardOverlayUI;
+    [SerializeField] private CountdownOverlayUI countdownOverlayUI;
 
     [Header("Effect Cards")]
     [SerializeField] private List<EffectCardDefinition> hazardPool = new List<EffectCardDefinition>();
@@ -91,16 +94,37 @@ public class RoundManager : MonoBehaviour
         StartCoroutine(PlayerDeathRoutine(deadPlayer));
     }
 
+    private void DisablePlayerMovement()
+    {
+        if (player1 != null)
+            player1.FinishRound();
+
+        if (player2 != null)
+            player2.FinishRound();
+    }
+
+    private void EnablePlayerMovement()
+    {
+        if (player1 != null)
+        {
+            player1.Effects.NotifyRoundStart();
+            player1.SetState(PlayerState.Normal);
+        }
+
+        if (player2 != null)
+        {
+            player2.Effects.NotifyRoundStart();
+            player2.SetState(PlayerState.Normal);
+        }
+    }
+
     private IEnumerator RoundWinRoutine(PlayerController winner)
     {
         roundLocked = true;
 
         PlayerController loser = GetOtherPlayer(winner);
 
-        winner.FinishRound();
-
-        if (loser != null)
-            loser.FinishRound();
+        DisablePlayerMovement();
 
         if (winner.PlayerId == PlayerId.Player1)
             p1Score++;
@@ -120,6 +144,7 @@ public class RoundManager : MonoBehaviour
             yield break;
         }
 
+        // 1. Winner screen
         if (roundOverOverlayUI != null)
             roundOverOverlayUI.ShowRoundOver(winner.PlayerId);
 
@@ -128,31 +153,51 @@ public class RoundManager : MonoBehaviour
         if (roundOverOverlayUI != null)
             roundOverOverlayUI.Hide();
 
-        // This was missing.
+        // 2. Card selection screen
         yield return CardChoiceRoutine(loser, winner);
 
         if (cardOverlayUI != null)
             cardOverlayUI.Hide();
 
-        yield return StartNextRoundAfterCardRoutine(winner);
+        // 3. Reset players, freeze them, countdown, then unlock movement
+        yield return StartNextRoundWithCountdownRoutine(winner);
     }
 
-    private IEnumerator StartNextRoundAfterCardRoutine(PlayerController cursedWinner)
+    private IEnumerator StartNextRoundWithCountdownRoutine(PlayerController cursedWinner)
     {
-        // Remove old round effects.
+        if (roundOverOverlayUI != null)
+            roundOverOverlayUI.Hide();
+
+        if (cardOverlayUI != null)
+            cardOverlayUI.Hide();
+
         ClearAllPlayerEffects();
 
-        // Reset positions/states first.
         ResetBothPlayersForRound();
 
-        // Let Unity process the transform/state reset for one frame.
-        yield return null;
+        DisablePlayerMovement();
 
-        // Apply the selected curse to the winner for the new round.
         if (selectedCard != null && selectedCard.effectAsset != null && cursedWinner != null)
             cursedWinner.Effects.AddEffect(selectedCard.effectAsset);
 
-        // Start accepting finish/death triggers again.
+        for (int i = roundStartCountdownSeconds; i > 0; i--)
+        {
+            if (countdownOverlayUI != null)
+                countdownOverlayUI.ShowNumber(i);
+
+            yield return new WaitForSeconds(1f);
+        }
+
+        if (countdownOverlayUI != null)
+            countdownOverlayUI.ShowGo();
+
+        yield return new WaitForSeconds(goScreenTime);
+
+        if (countdownOverlayUI != null)
+            countdownOverlayUI.Hide();
+
+        EnablePlayerMovement();
+
         roundLocked = false;
     }
 
@@ -366,5 +411,8 @@ public class RoundManager : MonoBehaviour
 
         if (cardOverlayUI != null)
             cardOverlayUI.Hide();
+
+        if (countdownOverlayUI != null)
+            countdownOverlayUI.Hide();
     }
 }
