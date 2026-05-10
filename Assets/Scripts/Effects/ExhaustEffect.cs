@@ -3,28 +3,20 @@ using UnityEngine;
 [CreateAssetMenu(menuName = "Lab Rats/Effects/Exhaust Effect")]
 public class ExhaustEffect : PlayerEffect
 {
-    [Header("Stat Multipliers")]
-    [SerializeField] private float moveSpeedMultiplier = 0.75f;
-    [SerializeField] private float accelerationMultiplier = 0.65f;
-    [SerializeField] private float decelerationMultiplier = 0.7f;
-    [SerializeField] private float airControlMultiplier = 0.65f;
-    [SerializeField] private float rotationSpeedMultiplier = 0.85f;
+    [Header("Hidden Stamina")]
+    [SerializeField] private float minStaminaMoveMultiplier = 0.12f;
+    [SerializeField] private float minStaminaAccelerationMultiplier = 0.2f;
+    [SerializeField] private float minStaminaDecelerationMultiplier = 0.25f;
+    [SerializeField] private float minStaminaRotationMultiplier = 0.35f;
+    [SerializeField] private float staminaDrainPerSecondWhileMoving = 0.6f;
+    [SerializeField] private float staminaRecoveryPerSecondWhileStill = 1.0f;
+    [SerializeField] private float movingSpeedThreshold = 0.15f;
 
-    [Header("Cough Timing")]
-    [SerializeField] private float firstCoughDelay = 0.75f;
-    [SerializeField] private float coughInterval = 1.25f;
-    [SerializeField] private float coughStunDuration = 0.12f;
-
-    [Header("Tiny Push")]
-    [SerializeField] private bool applyTinyPush = true;
-    [SerializeField] private float pushForce = 1.8f;
-    [SerializeField] private float upwardForce = 0.2f;
-
-    private float coughTimer;
+    private float staminaNormalized = 1f;
 
     public override void OnApply(PlayerController player)
     {
-        ResetCoughTimer();
+        ResetStamina(player);
     }
 
     public override void ModifyStats(PlayerStats stats)
@@ -32,16 +24,20 @@ public class ExhaustEffect : PlayerEffect
         if (stats == null)
             return;
 
-        stats.moveSpeed *= moveSpeedMultiplier;
-        stats.acceleration *= accelerationMultiplier;
-        stats.deceleration *= decelerationMultiplier;
-        stats.airControl *= airControlMultiplier;
-        stats.rotationSpeed *= rotationSpeedMultiplier;
+        float staminaMoveScale = Mathf.Lerp(minStaminaMoveMultiplier, 1f, staminaNormalized);
+        float staminaAccelerationScale = Mathf.Lerp(minStaminaAccelerationMultiplier, 1f, staminaNormalized);
+        float staminaDecelerationScale = Mathf.Lerp(minStaminaDecelerationMultiplier, 1f, staminaNormalized);
+        float staminaRotationScale = Mathf.Lerp(minStaminaRotationMultiplier, 1f, staminaNormalized);
+
+        stats.moveSpeed *= staminaMoveScale;
+        stats.acceleration *= staminaAccelerationScale;
+        stats.deceleration *= staminaDecelerationScale;
+        stats.rotationSpeed *= staminaRotationScale;
     }
 
     public override void OnRoundStart(PlayerController player)
     {
-        ResetCoughTimer();
+        ResetStamina(player);
     }
 
     public override void Tick(PlayerController player, float deltaTime)
@@ -49,42 +45,34 @@ public class ExhaustEffect : PlayerEffect
         if (player == null)
             return;
 
-        coughTimer -= deltaTime;
+        float previousStamina = staminaNormalized;
+        float horizontalSpeed = player.GetHorizontalSpeed();
+        bool isMoving = horizontalSpeed > movingSpeedThreshold;
 
-        if (coughTimer > 0f)
-            return;
+        if (isMoving)
+            staminaNormalized -= staminaDrainPerSecondWhileMoving * deltaTime;
+        else
+            staminaNormalized += staminaRecoveryPerSecondWhileStill * deltaTime;
 
-        if (coughStunDuration > 0f)
-            player.Stun(coughStunDuration);
+        staminaNormalized = Mathf.Clamp01(staminaNormalized);
 
-        if (applyTinyPush)
-        {
-            Vector3 backwardDirection = -player.GetLastMoveDirection();
-            backwardDirection.y = 0f;
-
-            if (backwardDirection.sqrMagnitude < 0.0001f)
-            {
-                backwardDirection = -player.transform.forward;
-                backwardDirection.y = 0f;
-            }
-
-            if (backwardDirection.sqrMagnitude > 0.0001f)
-                backwardDirection.Normalize();
-
-            Vector3 push = (backwardDirection * pushForce) + (Vector3.up * upwardForce);
-            player.ApplyExternalForce(push, ForceMode.Impulse);
-        }
-
-        coughTimer = Mathf.Max(0.01f, coughInterval);
+        if (Mathf.Abs(staminaNormalized - previousStamina) > 0.0001f)
+            player.RecalculateStats();
     }
 
     public override void OnRemove(PlayerController player)
     {
-        coughTimer = 0f;
+        staminaNormalized = 1f;
+
+        if (player != null)
+            player.RecalculateStats();
     }
 
-    private void ResetCoughTimer()
+    private void ResetStamina(PlayerController player)
     {
-        coughTimer = Mathf.Max(0f, firstCoughDelay);
+        staminaNormalized = 1f;
+
+        if (player != null)
+            player.RecalculateStats();
     }
 }

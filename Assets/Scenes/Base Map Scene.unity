@@ -782,7 +782,7 @@ MonoBehaviour:
   - cardName: Exhaust
     cardImage: {fileID: 21300000, guid: 76303571e94d0ee4a9f07b854121c089, type: 3}
     effectType: 2
-    effectAsset: {fileID: 0}
+    effectAsset: {fileID: 11400000, guid: 53f9f15c87b5ef249a805f8dee3dbd70, type: 2}
   - cardName: Pusher
     cardImage: {fileID: 21300000, guid: 83eac13200ee35a469ccf222025b8bc1, type: 3}
     effectType: 4
@@ -796,7 +796,7 @@ MonoBehaviour:
     effectType: 5
     effectAsset: {fileID: 0}
   debugForceCardInChoices: 1
-  debugForcedHazardPoolIndex: 3
+  debugForcedHazardPoolIndex: 1
 --- !u!4 &110720409
 Transform:
   m_ObjectHideFlags: 0

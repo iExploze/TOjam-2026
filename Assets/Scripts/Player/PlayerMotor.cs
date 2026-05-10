@@ -104,6 +104,20 @@ public class PlayerMotor : MonoBehaviour
         rb.AddForce(force, forceMode);
     }
 
+    public float GetHorizontalSpeed()
+    {
+        if (rb == null)
+            return 0f;
+
+        Vector3 horizontalVelocity = new Vector3(
+            rb.linearVelocity.x,
+            0f,
+            rb.linearVelocity.z
+        );
+
+        return horizontalVelocity.magnitude;
+    }
+
     public void ResetVelocity()
     {
         rb.linearVelocity = Vector3.zero;

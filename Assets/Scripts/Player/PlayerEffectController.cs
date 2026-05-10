@@ -7,6 +7,13 @@ public abstract class PlayerEffect : ScriptableObject
     public string effectName;
     [TextArea] public string description;
 
+    [Header("HUD Display")]
+    [SerializeField] private Sprite hudIcon;
+    [SerializeField] private bool showOnHud = true;
+
+    public Sprite HudIcon => hudIcon;
+    public bool ShowOnHud => showOnHud;
+
     public virtual void OnApply(PlayerController player) { }
 
     public virtual void ModifyStats(PlayerStats stats) { }
@@ -31,6 +38,7 @@ public class PlayerEffectController : MonoBehaviour
     private PlayerController player;
 
     public IReadOnlyList<PlayerEffect> ActiveEffects => activeEffects;
+    public event System.Action EffectsChanged;
 
     public void Initialize(PlayerController owner)
     {
@@ -56,6 +64,8 @@ public class PlayerEffectController : MonoBehaviour
 
         player.RecalculateStats();
 
+        EffectsChanged?.Invoke();
+
         if (logEffects)
             Debug.Log($"{player.name} received effect: {effectInstance.effectName}");
     }
@@ -70,6 +80,8 @@ public class PlayerEffectController : MonoBehaviour
             effect.OnRemove(player);
             player.RecalculateStats();
 
+            EffectsChanged?.Invoke();
+
             if (logEffects)
                 Debug.Log($"{player.name} removed effect: {effect.effectName}");
         }
@@ -77,6 +89,9 @@ public class PlayerEffectController : MonoBehaviour
 
     public void ClearEffects()
     {
+        if (activeEffects.Count == 0)
+            return;
+
         foreach (PlayerEffect effect in activeEffects)
         {
             if (effect != null)
@@ -86,6 +101,7 @@ public class PlayerEffectController : MonoBehaviour
         activeEffects.Clear();
 
         player.RecalculateStats();
+        EffectsChanged?.Invoke();
         /*
         if (logEffects)
             Debug.Log($"{player.name} cleared all effects.");
