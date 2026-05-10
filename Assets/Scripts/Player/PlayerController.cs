@@ -39,7 +39,6 @@ public class PlayerStats
     }
 }
 
-
 [RequireComponent(typeof(PlayerInputHandler))]
 [RequireComponent(typeof(PlayerMotor))]
 [RequireComponent(typeof(PlayerEffectController))]
@@ -88,7 +87,7 @@ public class PlayerController : MonoBehaviour
         effects.Initialize(this);
 
         RecalculateStats();
-        State = PlayerState.Normal;
+        SetState(PlayerState.Normal);
     }
 
     private void Update()
@@ -123,28 +122,34 @@ public class PlayerController : MonoBehaviour
     {
         State = newState;
 
-        if (State != PlayerState.Normal)
-        {
+        bool canMove = State == PlayerState.Normal;
+
+        if (input != null)
+            input.SetInputEnabled(canMove);
+
+        if (!canMove && motor != null)
             motor.StopHorizontalMovement();
-        }
     }
 
     public void ResetForRound(Vector3 position, Quaternion rotation)
     {
-        transform.position = position;
-        transform.rotation = rotation;
+        transform.SetPositionAndRotation(position, rotation);
 
-        // Very important:
-        SetState(PlayerState.Normal);
+        motor.ResetVelocity();
+        input.ResetInput();
 
         RecalculateStats();
+        SetState(PlayerState.Normal);
     }
 
     public void FinishRound()
     {
-        State = PlayerState.Finished;
-        motor.StopHorizontalMovement();
         effects.NotifyRoundEnd();
+
+        SetState(PlayerState.Finished);
+
+        motor.ResetVelocity();
+        input.ResetInput();
     }
 
     public void RespawnAt(Vector3 spawnPosition, Quaternion spawnRotation)
@@ -154,9 +159,8 @@ public class PlayerController : MonoBehaviour
         motor.ResetVelocity();
         input.ResetInput();
 
-        State = PlayerState.Normal;
-
         RecalculateStats();
+        SetState(PlayerState.Normal);
     }
 
     public void Stun(float duration)
@@ -167,12 +171,11 @@ public class PlayerController : MonoBehaviour
 
     private System.Collections.IEnumerator StunRoutine(float duration)
     {
-        State = PlayerState.Stunned;
-        motor.StopHorizontalMovement();
+        SetState(PlayerState.Stunned);
 
         yield return new WaitForSeconds(duration);
 
         if (State == PlayerState.Stunned)
-            State = PlayerState.Normal;
+            SetState(PlayerState.Normal);
     }
 }

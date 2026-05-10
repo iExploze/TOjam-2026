@@ -26,6 +26,7 @@ public class PlayerInputHandler : MonoBehaviour
     public bool JumpPressed { get; private set; }
 
     private Keyboard keyboard;
+    private bool inputEnabled = true;
 
     private void Awake()
     {
@@ -41,10 +42,9 @@ public class PlayerInputHandler : MonoBehaviour
     {
         keyboard ??= Keyboard.current;
 
-        if (keyboard == null)
+        if (!inputEnabled || keyboard == null)
         {
-            MoveInput = Vector2.zero;
-            JumpPressed = false;
+            ResetInput();
             return;
         }
 
@@ -119,6 +119,14 @@ public class PlayerInputHandler : MonoBehaviour
             return false;
 
         return keyboard[key].wasPressedThisFrame;
+    }
+
+    public void SetInputEnabled(bool enabled)
+    {
+        inputEnabled = enabled;
+
+        if (!inputEnabled)
+            ResetInput();
     }
 
     public void ConsumeJump()
