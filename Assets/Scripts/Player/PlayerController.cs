@@ -65,6 +65,9 @@ public class PlayerController : MonoBehaviour
     public Transform VisualRoot => visualRoot;
     public Transform GroundCheck => groundCheck;
 
+    public PlayerId PlayerId => input.PlayerIndex == 0 ? PlayerId.Player1 : PlayerId.Player2;
+    public PlayerEffectController Effects => effects;
+
     private void Awake()
     {
         input ??= GetComponent<PlayerInputHandler>();
@@ -84,7 +87,7 @@ public class PlayerController : MonoBehaviour
         effects.Initialize(this);
 
         RecalculateStats();
-        State = PlayerState.Normal;
+        SetState(PlayerState.Normal);
     }
 
     private void Update()
@@ -119,30 +122,51 @@ public class PlayerController : MonoBehaviour
     {
         State = newState;
 
-        if (State != PlayerState.Normal)
-        {
+        bool canMove = State == PlayerState.Normal;
+
+        if (input != null)
+            input.SetInputEnabled(canMove);
+
+        if (!canMove && motor != null)
             motor.StopHorizontalMovement();
-        }
     }
 
-    public void ResetForRound(Vector3 spawnPosition, Quaternion spawnRotation)
+    public void ResetForRound(Vector3 position, Quaternion rotation)
     {
-        transform.SetPositionAndRotation(spawnPosition, spawnRotation);
+        if (motor != null)
+            motor.TeleportTo(position, rotation);
+        else
+            transform.SetPositionAndRotation(position, rotation);
 
-        motor.ResetVelocity();
-        input.ResetInput();
-
-        State = PlayerState.Normal;
+        if (input != null)
+            input.ResetInput();
 
         RecalculateStats();
-        effects.NotifyRoundStart();
+        SetState(PlayerState.Normal);
     }
 
     public void FinishRound()
     {
-        State = PlayerState.Finished;
-        motor.StopHorizontalMovement();
         effects.NotifyRoundEnd();
+
+        SetState(PlayerState.Finished);
+
+        motor.ResetVelocity();
+        input.ResetInput();
+    }
+
+    public void RespawnAt(Vector3 spawnPosition, Quaternion spawnRotation)
+    {
+        if (motor != null)
+            motor.TeleportTo(spawnPosition, spawnRotation);
+        else
+            transform.SetPositionAndRotation(spawnPosition, spawnRotation);
+
+        if (input != null)
+            input.ResetInput();
+
+        RecalculateStats();
+        SetState(PlayerState.Normal);
     }
 
     public void Stun(float duration)
@@ -153,12 +177,11 @@ public class PlayerController : MonoBehaviour
 
     private System.Collections.IEnumerator StunRoutine(float duration)
     {
-        State = PlayerState.Stunned;
-        motor.StopHorizontalMovement();
+        SetState(PlayerState.Stunned);
 
         yield return new WaitForSeconds(duration);
 
         if (State == PlayerState.Stunned)
-            State = PlayerState.Normal;
+            SetState(PlayerState.Normal);
     }
 }
